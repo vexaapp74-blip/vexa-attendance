@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VÉXA | نظام الحضور والطلبات</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --brand: #0f172a;
+      --accent: #2563eb;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .topbar {
+      background: var(--brand);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand-title { font-weight: 700; font-size: 18px; letter-spacing: 0.3px; }
+    .brand-sub { font-size: 12px; color: #cbd5e1; }
+    .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-light { background: rgba(255,255,255,0.14); color: #fff; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .btn-bad { background: var(--bad); color: #fff; }
+    .btn-warn { background: var(--warn); color: #fff; }
+    .btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+
+    .container { max-width: 1160px; margin: 20px auto; padding: 0 16px 40px; }
+    .mobile-wrap { max-width: 540px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+      margin-bottom: 16px;
+    }
+    .card-title { margin: 0 0 12px; font-size: 17px; font-weight: 700; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    @media (max-width: 820px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .grid-2, .grid-4 { grid-template-columns: 1fr; } }
+
+    .stat {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .stat .num { font-size: 24px; font-weight: 800; margin-top: 4px; }
+    .stat .lbl { font-size: 12px; color: var(--muted); }
+
+    label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 5px; color: #334155; }
+    input, select, textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+
+    .att-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .att-btn { padding: 14px; font-size: 15px; border-radius: 12px; }
+
+    .alert {
+      margin-top: 12px;
+      padding: 11px 13px;
+      border-radius: 12px;
+      font-size: 13px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+      white-space: pre-line;
+    }
+    .alert.ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .alert.err { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 9px 13px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { background: var(--soft); color: #334155; font-weight: 700; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .b-pending { background: #fef3c7; color: #92400e; }
+    .b-approved { background: #dcfce7; color: #166534; }
+    .b-rejected { background: #fee2e2; color: #991b1b; }
+
+    .hidden { display: none !important; }
+    .small-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .row-actions { display: flex; gap: 6px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand-title">VÉXA Attendance & Requests</div>
+      <div class="brand-sub" id="modeBadge">وضع الموظف (موبايل)</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn btn-light" onclick="switchToEmployee()">واجهة الموظف</button>
+      <button class="btn btn-primary" onclick="openAdminGate()">لوحة المديرين (كمبيوتر)</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ==================== واجهة الموظف ==================== -->
+    <section id="employeeView" class="mobile-wrap">
+      <div class="card">
+        <h2 class="card-title">تسجيل الحضور والانصراف</h2>
+
+        <label for="empSelect">اختر اسمك (يُحفظ تلقائياً على جهازك)</label>
+        <select id="empSelect" onchange="onEmployeeSelected()">
+          <option value="">جاري تحميل الأسماء...</option>
+        </select>
+
+        <div id="empBranchInfo" class="small-note">اختر اسم الموظف لعرض بيانات الفرع ومواعيد العمل.</div>
+
+        <div class="att-btns">
+          <button class="btn btn-ok att-btn" onclick="handleAttendance('in')">تسجيل حضور</button>
+          <button class="btn btn-bad att-btn" onclick="handleAttendance('out')">تسجيل انصراف</button>
+        </div>
+
+        <div id="attStatus" class="alert">اسمح بالوصول للموقع الجغرافي لتسجيل الحضور أو الانصراف داخل نطاق الفرع.</div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">تقديم طلب جديد</h2>
+        <div class="tabs">
+          <button class="tab-btn active" id="tab-leave" onclick="setRequestTab('leave')">طلب إجازة</button>
+          <button class="tab-btn" id="tab-permission" onclick="setRequestTab('permission')">طلب إذن بالساعة</button>
+          <button class="tab-btn" id="tab-advance" onclick="setRequestTab('advance')">طلب سلفة</button>
+        </div>
+
+        <!-- نموذج الإجازة -->
+        <div id="form-leave">
+          <div class="grid-2">
+            <div>
+              <label for="leaveFrom">من تاريخ</label>
+              <input type="date" id="leaveFrom" />
+            </div>
+            <div>
+              <label for="leaveTo">إلى تاريخ</label>
+              <input type="date" id="leaveTo" />
+            </div>
+          </div>
+        </div>
+
+        <!-- نموذج الإذن بالساعة -->
+        <div id="form-permission" class="hidden">
+          <label for="permDate">تاريخ الإذن</label>
+          <input type="date" id="permDate" />
+          <div class="grid-2">
+            <div>
+              <label for="permFrom">من الساعة</label>
+              <input type="time" id="permFrom" />
+            </div>
+            <div>
+              <label for="permTo">إلى الساعة</label>
+              <input type="time" id="permTo" />
+            </div>
+          </div>
+        </div>
+
+        <!-- نموذج السلفة -->
+        <div id="form-advance" class="hidden">
+          <label for="advAmount">قيمة السلفة المطلوبة</label>
+          <input type="number" id="advAmount" min="1" step="0.01" placeholder="مثال: 1000" />
+        </div>
+
+        <label for="reqReason">السبب (اختياري)</label>
+        <textarea id="reqReason" placeholder="اكتب السبب إذا رغبت..."></textarea>
+
+        <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="submitRequest()">إرسال الطلب للمديرين</button>
+        <div id="reqStatus" class="alert hidden"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">طلباتي الأخيرة</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>النوع</th>
+                <th>التفاصيل</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="myRequestsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== نافذة دخول المديرين ==================== -->
+    <section id="adminAuthView" class="mobile-wrap hidden">
+      <div class="card">
+        <h2 class="card-title">دخول لوحة المديرين (مارينا / أبانوب)</h2>
+        <p class="small-note">
+          يُفضّل تفعيل ربط هذا الجهاز كـ <strong>كمبيوتر الإدارة الأساسي</strong> حتى يظل الوصول الإداري مخصصاً لجهاز الشركة.
+        </p>
+
+        <label for="adminSelect">اختر المدير</label>
+        <select id="adminSelect"></select>
+
+        <label for="adminPin">رمز مرور الإدارة</label>
+        <input type="password" id="adminPin" placeholder="أدخل رمز الإدارة" />
+
+        <label style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer;">
+          <input type="checkbox" id="trustPcCheck" style="width:auto;" checked />
+          <span>تثبيت هذا الجهاز كـ جهاز الإدارة المعتمد (Company PC)</span>
+        </label>
+
+        <div class="grid-2" style="margin-top:14px;">
+          <button class="btn btn-primary" onclick="verifyAdminLogin()">دخول للوحة الإدارة</button>
+          <button class="btn btn-outline" onclick="switchToEmployee()">رجوع لصفحة الموظف</button>
+        </div>
+
+        <div id="adminAuthMsg" class="alert hidden"></div>
+      </div>
+    </section>
+
+    <!-- ==================== لوحة المديرين ==================== -->
+    <section id="adminDashboardView" class="hidden">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2 class="card-title" style="margin:0;">لوحة متابعة المديرين</h2>
+            <div class="small-note" id="activeAdminLabel"></div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="refreshAllAdminData()">تحديث البيانات</button>
+            <button class="btn btn-bad" onclick="lockAdminSession()">قفل الجلسة</button>
+          </div>
+        </div>
+
+        <div class="grid-4" style="margin-top:14px;">
+          <div class="stat">
+            <div class="lbl">حاضرون اليوم</div>
+            <div class="num" id="statPresent">0</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">متأخرون اليوم (فرع 1)</div>
+            <div class="num" id="statLate">0</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">طلبات بانتظار القرار</div>
+            <div class="num" id="statPending">0</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">إجمالي الموظفين النشطين</div>
+            <div class="num" id="statEmpCount">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- الطلبات الفورية -->
+      <div class="card">
+        <h2 class="card-title">طلبات الإجازة والأذونات والسلف (لحظية)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الموظف</th>
+                <th>الفرع</th>
+                <th>النوع</th>
+                <th>التفاصيل</th>
+                <th>السبب</th>
+                <th>الحالة</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="adminRequestsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- متابعة الحضور والانصراف اليومية -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <h2 class="card-title" style="margin:0;">سجل الحضور والانصراف اليومي</h2>
+          <input type="date" id="adminDateFilter" style="width:auto;" onchange="loadAdminAttendance()" />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الموظف</th>
+                <th>الفرع</th>
+                <th>التاريخ</th>
+                <th>حضور</th>
+                <th>انصراف</th>
+                <th>تأخير (دقيقة)</th>
+                <th>الساعات</th>
+                <th>المسافة (متر)</th>
+              </tr>
+            </thead>
+            <tbody id="adminAttendanceBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- تقارير Excel -->
+      <div class="card">
+        <h2 class="card-title">تصدير تقارير Excel (.xlsx)</h2>
+        <div class="grid-4">
+          <div>
+            <label for="repEmpSelect">الموظف</label>
+            <select id="repEmpSelect">
+              <option value="ALL">كل الموظفين</option>
+            </select>
+          </div>
+          <div>
+            <label for="repPeriod">الفترة السريعة</label>
+            <select id="repPeriod" onchange="applyReportPeriod()">
+              <option value="custom">مخصص (من تاريخ إلى تاريخ)</option>
+              <option value="weekly">أسبوعي (آخر 7 أيام)</option>
+              <option value="monthly" selected>شهري (من بداية الشهر)</option>
+            </select>
+          </div>
+          <div>
+            <label for="repFrom">من تاريخ</label>
+            <input type="date" id="repFrom" />
+          </div>
+          <div>
+            <label for="repTo">إلى تاريخ</label>
+            <input type="date" id="repTo" />
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <button class="btn btn-ok" onclick="exportExcelReport()">تحميل تقرير Excel شامل (.xlsx)</button>
+        </div>
+      </div>
+
+      <!-- إدارة الموظفين وتعديلهم -->
+      <div class="card">
+        <h2 class="card-title">إدارة الموظفين (إضافة / تعديل / استبدال)</h2>
+        <div class="grid-4">
+          <div>
+            <label for="newEmpName">اسم الموظف</label>
+            <input type="text" id="newEmpName" placeholder="مثال: أحمد" />
+          </div>
+          <div>
+            <label for="newEmpRole">المسمى الوظيفي</label>
+            <input type="text" id="newEmpRole" placeholder="مثال: عامل انتاج" />
+          </div>
+          <div>
+            <label for="newEmpBranch">الفرع</label>
+            <select id="newEmpBranch">
+              <option value="1">الفرع الأول - vexa advertising</option>
+              <option value="2">الفرع الثاني - vexa & fampress</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-primary" style="width:100%;" onclick="addNewEmployee()">إضافة موظف</button>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="margin-top:14px;">
+          <table>
+            <thead>
+              <tr>
+                <th>الاسم</th>
+                <th>المسمى</th>
+                <th>الفرع</th>
+                <th>الحالة</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SUPABASE_URL = "https://vwzklargsvgckmtcihug.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3emtsYXJnc3ZnY2ttdGNpaHVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwOTYzMDAsImV4cCI6MjExMDY3MjMwMH0.7C-BJ_rDHs0N1XxBkEHUEWiIQRh5RKrIMm81DUk8crA";
+    const ADMIN_PASSCODE = "VEXA2026"; // يمكنك تغيير رمز الإدارة من هنا
+
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const STORAGE_EMP_KEY = "vexa_saved_employee_id";
+    const STORAGE_PC_KEY = "vexa_company_pc_token";
+    const STORAGE_ADMIN_AUTH = "vexa_admin_unlocked";
+
+    let branchesList = [];
+    let usersList = [];
+    let usersMap = {};
+    let branchesMap = {};
+    let currentReqTab = "leave";
+
+    function todayStr() {
+      const d = new Date();
+      const offset = d.getTimezoneOffset() * 60000;
+      return new Date(d - offset).toISOString().slice(0, 10);
+    }
+
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      if ([lat1, lon1, lat2, lon2].some(v => v === null || v === undefined || Number.isNaN(Number(v)))) {
+        return null;
+      }
+      const R = 6371000;
+      const toRad = x => (x * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function getCurrentLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("المتصفح لا يدعم تحديد الموقع الجغرافي."));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          err => reject(new Error("تعذر تحديد موقعك. تأكد من تفعيل GPS والسماح بالوصول للموقع.")),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
+
+    async function initApp() {
+      document.getElementById("adminDateFilter").value = todayStr();
+      document.getElementById("leaveFrom").value = todayStr();
+      document.getElementById("leaveTo").value = todayStr();
+      document.getElementById("permDate").value = todayStr();
+      applyReportPeriod();
+
+      await loadBranchesAndUsers();
+
+      if (sessionStorage.getItem(STORAGE_ADMIN_AUTH) === "true" && localStorage.getItem(STORAGE_PC_KEY)) {
+        showAdminDashboard();
+      } else {
+        switchToEmployee();
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      }
+    }
+
+    async function loadBranchesAndUsers() {
+      const [bRes, uRes] = await Promise.all([
+        db.from("branches").select("*").order("id"),
+        db.from("users").select("*").order("name")
+      ]);
+
+      if (!bRes.error && bRes.data) {
+        branchesList = bRes.data;
+        branchesMap = {};
+        bRes.data.forEach(b => { branchesMap[b.id] = b; });
+      }
+
+      if (!uRes.error && uRes.data) {
+        usersList = uRes.data;
+        usersMap = {};
+        uRes.data.forEach(u => { usersMap[u.id] = u; });
+      }
+
+      populateEmployeeSelect();
+      populateAdminSelect();
+      populateReportEmployeeSelect();
+    }
+
+    function populateEmployeeSelect() {
+      const sel = document.getElementById("empSelect");
+      const employees = usersList.filter(u => u.user_type === "employee" && u.is_active);
+      sel.innerHTML = '<option value="">-- اختر اسم الموظف --</option>';
+      employees.forEach(u => {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = `${u.name} (${u.role_title})`;
+        sel.appendChild(opt);
+      });
+
+      const savedId = localStorage.getItem(STORAGE_EMP_KEY);
+      if (savedId && employees.some(e => e.id === savedId)) {
+        sel.value = savedId;
+      }
+      onEmployeeSelected();
+    }
+
+    function onEmployeeSelected() {
+      const empId = document.getElementById("empSelect").value;
+      const infoEl = document.getElementById("empBranchInfo");
+      if (!empId) {
+        infoEl.textContent = "اختر اسم الموظف لعرض بيانات الفرع ومواعيد العمل.";
+        document.getElementById("myRequestsBody").innerHTML = "";
+        return;
+      }
+      localStorage.setItem(STORAGE_EMP_KEY, empId);
+      const emp = usersMap[empId];
+      const br = branchesMap[emp?.branch_id];
+      if (br) {
+        const scheduleText = br.strict_schedule
+          ? `الدوام ${br.work_start_time?.slice(0,5)} إلى ${br.work_end_time?.slice(0,5)} (مسموح تأخير ${br.grace_minutes} دقيقة)`
+          : "مواعيد مرنة طوال اليوم بدون تأخير";
+        infoEl.textContent = `الفرع: ${br.name} | ${scheduleText} | النطاق المسموح: ${br.allowed_radius_meters} متر`;
+      }
+      loadMyRequests(empId);
+    }
+
+    function calculateLateMinutes(branch, checkInDate) {
+      if (!branch || !branch.strict_schedule || !branch.work_start_time) return 0;
+      const [hh, mm] = branch.work_start_time.split(":").map(Number);
+      const allowedStart = new Date(checkInDate);
+      allowedStart.setHours(hh, mm + Number(branch.grace_minutes || 0), 0, 0);
+      const diffMs = checkInDate - allowedStart;
+      return diffMs > 0 ? Math.ceil(diffMs / 60000) : 0;
+    }
+
+    function setAttMessage(text, type = "") {
+      const el = document.getElementById("attStatus");
+      el.className = "alert" + (type ? " " + type : "");
+      el.textContent = text;
+    }
+
+    async function handleAttendance(actionType) {
+      const empId = document.getElementById("empSelect").value;
+      if (!empId) {
+        setAttMessage("من فضلك اختر اسمك أولاً.", "err");
+        return;
+      }
+      const emp = usersMap[empId];
+      const branch = branchesMap[emp.branch_id];
+      if (!branch) {
+        setAttMessage("هذا الموظف غير مرتبط بفرع في قاعدة البيانات.", "err");
+        return;
+      }
+
+      setAttMessage("جاري التحقق من إحداثيات الفرع وموقعك الحالي...");
+      try {
+        const coords = await getCurrentLocation();
+        const dist = haversineMeters(coords.lat, coords.lng, branch.lat, branch.lng);
+        const radius = Number(branch.allowed_radius_meters || 120);
+
+        if (dist === null || dist > radius) {
+          setAttMessage(
+            `أنت خارج نطاق الفرع (${branch.name}).\nالمسافة الحالية: ${dist ? Math.round(dist) : "غير متاحة"} متر — المسموح: ${radius} متر.`,
+            "err"
+          );
+          return;
+        }
+
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const workDate = todayStr();
+        const distRounded = Number(dist.toFixed(1));
+
+        if (actionType === "in") {
+          const lateMins = calculateLateMinutes(branch, now);
+          const { error } = await db.from("attendance").insert({
+            user_id: emp.id,
+            branch_id: branch.id,
+            work_date: workDate,
+            check_in: nowIso,
+            check_in_lat: coords.lat,
+            check_in_lng: coords.lng,
+            check_in_distance_m: distRounded,
+            late_minutes: lateMins
+          });
+          if (error) throw new Error(error.message);
+
+          const lateMsg = branch.strict_schedule
+            ? (lateMins > 0 ? `متأخر ${lateMins} دقيقة` : "في الموعد")
+            : "تسجيل حر (بدون تأخير)";
+          setAttMessage(`تم تسجيل الحضور بنجاح (${lateMsg}) — المسافة: ${distRounded} م.`, "ok");
+        } else {
+          const { data: openRows, error: findErr } = await db
+            .from("attendance")
+            .select("id, check_in")
+            .eq("user_id", emp.id)
+            .eq("work_date", workDate)
+            .is("check_out", null)
+            .order("check_in", { ascending: false })
+            .limit(1);
+
+          if (findErr) throw new Error(findErr.message);
+
+          if (openRows && openRows.length > 0) {
+            const row = openRows[0];
+            const diffHrs = row.check_in ? Math.max(0, (now - new Date(row.check_in)) / 3600000) : 0;
+            const { error: updErr } = await db
+              .from("attendance")
+              .update({
+                check_out: nowIso,
+                check_out_lat: coords.lat,
+                check_out_lng: coords.lng,
+                check_out_distance_m: distRounded,
+                total_hours: Number(diffHrs.toFixed(2))
+              })
+              .eq("id", row.id);
+            if (updErr) throw new Error(updErr.message);
+            setAttMessage(`تم تسجيل الانصراف بنجاح — إجمالي الساعات: ${diffHrs.toFixed(2)} ساعة.`, "ok");
+          } else {
+            const { error: insErr } = await db.from("attendance").insert({
+              user_id: emp.id,
+              branch_id: branch.id,
+              work_date: workDate,
+              check_out: nowIso,
+              check_out_lat: coords.lat,
+              check_out_lng: coords.lng,
+              check_out_distance_m: distRounded,
+              total_hours: 0
+            });
+            if (insErr) throw new Error(insErr.message);
+            setAttMessage(`تم تسجيل الانصراف بنجاح — المسافة: ${distRounded} م.`, "ok");
+          }
+        }
+      } catch (err) {
+        setAttMessage(err.message || "حدث خطأ أثناء التسجيل.", "err");
+      }
+    }
+
+    function setRequestTab(tab) {
+      currentReqTab = tab;
+      ["leave", "permission", "advance"].forEach(t => {
+        document.getElementById("tab-" + t).classList.toggle("active", t === tab);
+        document.getElementById("form-" + t).classList.toggle("hidden", t !== tab);
+      });
+    }
+
+    async function submitRequest() {
+      const empId = document.getElementById("empSelect").value;
+      const msgEl = document.getElementById("reqStatus");
+      msgEl.classList.remove("hidden");
+
+      if (!empId) {
+        msgEl.className = "alert err";
+        msgEl.textContent = "اختر اسم الموظف أولاً.";
+        return;
+      }
+
+      const emp = usersMap[empId];
+      const reason = document.getElementById("reqReason").value.trim() || null;
+
+      const payload = {
+        user_id: emp.id,
+        branch_id: emp.branch_id,
+        request_type: currentReqTab,
+        status: "pending",
+        reason
+      };
+
+      if (currentReqTab === "leave") {
+        const fromVal = document.getElementById("leaveFrom").value;
+        const toVal = document.getElementById("leaveTo").value;
+        if (!fromVal || !toVal) {
+          msgEl.className = "alert err";
+          msgEl.textContent = "حدد تاريخ بداية ونهاية الإجازة.";
+          return;
+        }
+        payload.leave_from = fromVal;
+        payload.leave_to = toVal;
+      } else if (currentReqTab === "permission") {
+        const pDate = document.getElementById("permDate").value;
+        const pFrom = document.getElementById("permFrom").value;
+        const pTo = document.getElementById("permTo").value;
+        if (!pDate || !pFrom || !pTo) {
+          msgEl.className = "alert err";
+          msgEl.textContent = "حدد تاريخ الإذن وساعة البداية والنهاية.";
+          return;
+        }
+        const [h1, m1] = pFrom.split(":").map(Number);
+        const [h2, m2] = pTo.split(":").map(Number);
+        const hrs = Math.max(0, ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60);
+        payload.permission_date = pDate;
+        payload.permission_from_time = pFrom;
+        payload.permission_to_time = pTo;
+        payload.permission_hours = Number(hrs.toFixed(2));
+      } else if (currentReqTab === "advance") {
+        const amt = Number(document.getElementById("advAmount").value);
+        if (!amt || amt <= 0) {
+          msgEl.className = "alert err";
+          msgEl.textContent = "أدخل قيمة سلفة صحيحة.";
+          return;
+        }
+        payload.advance_amount = amt;
+      }
+
+      const { error } = await db.from("requests").insert(payload);
+      if (error) {
+        msgEl.className = "alert err";
+        msgEl.textContent = "تعذر إرسال الطلب: " + error.message;
+        return;
+      }
+
+      document.getElementById("reqReason").value = "";
+      if (currentReqTab === "advance") document.getElementById("advAmount").value = "";
+      msgEl.className = "alert ok";
+      msgEl.textContent = "تم إرسال طلبك بنجاح وسيظهر للمديرين فوراً.";
+      loadMyRequests(empId);
+    }
+
+    function formatReqType(t) {
+      if (t === "leave") return "إجازة";
+      if (t === "permission") return "إذن بالساعة";
+      return "سلفة";
+    }
+
+    function formatReqDetails(r) {
+      if (r.request_type === "leave") return `${r.leave_from || ""} إلى ${r.leave_to || ""}`;
+      if (r.request_type === "permission") return `${r.permission_date || ""} (${r.permission_from_time?.slice(0,5) || ""} - ${r.permission_to_time?.slice(0,5) || ""})`;
+      return `${r.advance_amount || 0} جنيه`;
+    }
+
+    function formatStatusBadge(st) {
+      if (st === "approved") return '<span class="badge b-approved">مقبول</span>';
+      if (st === "rejected") return '<span class="badge b-rejected">مرفوض</span>';
+      return '<span class="badge b-pending">قيد الانتظار</span>';
+    }
+
+    async function loadMyRequests(empId) {
+      const { data } = await db
+        .from("requests")
+        .select("*")
+        .eq("user_id", empId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      const body = document.getElementById("myRequestsBody");
+      if (!data || data.length === 0) {
+        body.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#64748b;">لا توجد طلبات سابقة.</td></tr>';
+        return;
+      }
+      body.innerHTML = data.map(r => `
+        <tr>
+          <td>${formatReqType(r.request_type)}</td>
+          <td>${formatReqDetails(r)}</td>
+          <td>${formatStatusBadge(r.status)}</td>
+        </tr>
+      `).join("");
+    }
+
+    /* ==================== صلاحيات المديرين وكمبيوتر الشركة ==================== */
+    function switchToEmployee() {
+      document.getElementById("employeeView").classList.remove("hidden");
+      document.getElementById("adminAuthView").classList.add("hidden");
+      document.getElementById("adminDashboardView").classList.add("hidden");
+      document.getElementById("modeBadge").textContent = "وضع الموظف (موبايل)";
+    }
+
+    function populateAdminSelect() {
+      const sel = document.getElementById("adminSelect");
+      const admins = usersList.filter(u => u.user_type === "admin" && u.is_active);
+      sel.innerHTML = admins.map(a => `<option value="${a.id}">${a.name} (${a.role_title})</option>`).join("");
+    }
+
+    function openAdminGate() {
+      const isTrustedPc = Boolean(localStorage.getItem(STORAGE_PC_KEY));
+      const isUnlocked = sessionStorage.getItem(STORAGE_ADMIN_AUTH) === "true";
+      if (isTrustedPc && isUnlocked) {
+        showAdminDashboard();
+        return;
+      }
+      document.getElementById("employeeView").classList.add("hidden");
+      document.getElementById("adminDashboardView").classList.add("hidden");
+      document.getElementById("adminAuthView").classList.remove("hidden");
+      document.getElementById("modeBadge").textContent = "تحقق صلاحيات الإدارة";
+    }
+
+    function verifyAdminLogin() {
+      const adminId = document.getElementById("adminSelect").value;
+      const pin = document.getElementById("adminPin").value.trim();
+      const trustPc = document.getElementById("trustPcCheck").checked;
+      const msgEl = document.getElementById("adminAuthMsg");
+
+      if (pin !== ADMIN_PASSCODE) {
+        msgEl.className = "alert err";
+        msgEl.classList.remove("hidden");
+        msgEl.textContent = "رمز مرور الإدارة غير صحيح.";
+        return;
+      }
+
+      if (trustPc && !localStorage.getItem(STORAGE_PC_KEY)) {
+        localStorage.setItem(STORAGE_PC_KEY, "VEXA_PC_" + crypto.randomUUID());
+      }
+      sessionStorage.setItem(STORAGE_ADMIN_AUTH, "true");
+      sessionStorage.setItem("vexa_active_admin_id", adminId);
+      document.getElementById("adminPin").value = "";
+      msgEl.classList.add("hidden");
+      showAdminDashboard();
+    }
+
+    function lockAdminSession() {
+      sessionStorage.removeItem(STORAGE_ADMIN_AUTH);
+      switchToEmployee();
+    }
+
+    async function showAdminDashboard() {
+      document.getElementById("employeeView").classList.add("hidden");
+      document.getElementById("adminAuthView").classList.add("hidden");
+      document.getElementById("adminDashboardView").classList.remove("hidden");
+      document.getElementById("modeBadge").textContent = "لوحة المديرين — كمبيوتر الإدارة";
+
+      const adminId = sessionStorage.getItem("vexa_active_admin_id");
+      const adminObj = usersMap[adminId];
+      document.getElementById("activeAdminLabel").textContent = adminObj
+        ? `المسؤول الحالي: ${adminObj.name} — ${adminObj.role_title}`
+        : "صلاحيات الإدارة مفعلة على هذا الجهاز";
+
+      await refreshAllAdminData();
+    }
+
+    async function refreshAllAdminData() {
+      await loadBranchesAndUsers();
+      await Promise.all([
+        loadAdminAttendance(),
+        loadAdminRequests()
+      ]);
+      renderAdminUsersTable();
+    }
+
+    async function loadAdminAttendance() {
+      const filterDate = document.getElementById("adminDateFilter").value || todayStr();
+      const { data } = await db
+        .from("attendance")
+        .select("*")
+        .eq("work_date", filterDate)
+        .order("check_in", { ascending: false });
+
+      const rows = data || [];
+      const uniquePresent = new Set(rows.filter(r => r.check_in).map(r => r.user_id)).size;
+      const lateCount = rows.filter(r => Number(r.late_minutes || 0) > 0).length;
+      const activeEmployees = usersList.filter(u => u.user_type === "employee" && u.is_active).length;
+
+      document.getElementById("statPresent").textContent = uniquePresent;
+      document.getElementById("statLate").textContent = lateCount;
+      document.getElementById("statEmpCount").textContent = activeEmployees;
+
+      const body = document.getElementById("adminAttendanceBody");
+      if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#64748b;">لا توجد سجلات حضور لهذا التاريخ.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = rows.map(r => {
+        const uName = usersMap[r.user_id]?.name || r.user_id;
+        const bName = branchesMap[r.branch_id]?.name || "-";
+        const inTime = r.check_in ? new Date(r.check_in).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "-";
+        const outTime = r.check_out ? new Date(r.check_out).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "-";
+        const dist = r.check_in_distance_m ?? r.check_out_distance_m ?? "-";
+        return `
+          <tr>
+            <td>${uName}</td>
+            <td>${bName}</td>
+            <td>${r.work_date}</td>
+            <td>${inTime}</td>
+            <td>${outTime}</td>
+            <td>${r.late_minutes ?? 0}</td>
+            <td>${r.total_hours ?? 0}</td>
+            <td>${dist}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadAdminRequests() {
+      const { data } = await db
+        .from("requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      const rows = data || [];
+      const pendingCount = rows.filter(r => r.status === "pending").length;
+      document.getElementById("statPending").textContent = pendingCount;
+
+      const body = document.getElementById("adminRequestsBody");
+      if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#64748b;">لا توجد طلبات حتى الآن.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = rows.map(r => {
+        const uName = usersMap[r.user_id]?.name || r.user_id;
+        const bName = branchesMap[r.branch_id]?.name || "-";
+        const actionBtns = r.status === "pending"
+          ? `<div class="row-actions">
+               <button class="btn btn-ok" style="padding:6px 10px; font-size:12px;" onclick="decideRequest('${r.id}', 'approved')">قبول</button>
+               <button class="btn btn-bad" style="padding:6px 10px; font-size:12px;" onclick="decideRequest('${r.id}', 'rejected')">رفض</button>
+             </div>`
+          : `<span class="small-note">تم البت</span>`;
+
+        return `
+          <tr>
+            <td>${uName}</td>
+            <td>${bName}</td>
+            <td>${formatReqType(r.request_type)}</td>
+            <td>${formatReqDetails(r)}</td>
+            <td>${r.reason || "-"}</td>
+            <td>${formatStatusBadge(r.status)}</td>
+            <td>${actionBtns}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function decideRequest(reqId, decision) {
+      const adminId = sessionStorage.getItem("vexa_active_admin_id") || null;
+      const { error } = await db
+        .from("requests")
+        .update({
+          status: decision,
+          reviewed_by: adminId,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq("id", reqId);
+
+      if (!error) {
+        await loadAdminRequests();
+        const currentEmp = document.getElementById("empSelect").value;
+        if (currentEmp) loadMyRequests(currentEmp);
+      }
+    }
+
+    function renderAdminUsersTable() {
+      const body = document.getElementById("adminUsersBody");
+      body.innerHTML = usersList.map(u => {
+        const brName = branchesMap[u.branch_id]?.name || "-";
+        const statusLabel = u.is_active
+          ? '<span class="badge b-approved">نشط</span>'
+          : '<span class="badge b-rejected">متوقف</span>';
+        const toggleText = u.is_active ? "إيقاف" : "تفعيل";
+        return `
+          <tr>
+            <td>${u.name}</td>
+            <td>${u.role_title}</td>
+            <td>${brName}</td>
+            <td>${statusLabel}</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-outline" style="padding:5px 9px; font-size:12px;" onclick="editEmployeeName('${u.id}')">تعديل الاسم</button>
+                <button class="btn btn-warn" style="padding:5px 9px; font-size:12px;" onclick="toggleEmployeeActive('${u.id}', ${!u.is_active})">${toggleText}</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function addNewEmployee() {
+      const name = document.getElementById("newEmpName").value.trim();
+      const role = document.getElementById("newEmpRole").value.trim() || "موظف";
+      const branchId = Number(document.getElementById("newEmpBranch").value);
+      if (!name) return;
+
+      const { error } = await db.from("users").insert({
+        name,
+        role_title: role,
+        user_type: "employee",
+        branch_id: branchId,
+        is_active: true
+      });
+
+      if (!error) {
+        document.getElementById("newEmpName").value = "";
+        document.getElementById("newEmpRole").value = "";
+        await refreshAllAdminData();
+      }
+    }
+
+    async function editEmployeeName(userId) {
+      const current = usersMap[userId];
+      if (!current) return;
+      const nextName = prompt("أدخل الاسم الجديد للموظف:", current.name);
+      if (!nextName || !nextName.trim()) return;
+      const { error } = await db.from("users").update({ name: nextName.trim() }).eq("id", userId);
+      if (!error) await refreshAllAdminData();
+    }
+
+    async function toggleEmployeeActive(userId, nextState) {
+      const { error } = await db.from("users").update({ is_active: nextState }).eq("id", userId);
+      if (!error) await refreshAllAdminData();
+    }
+
+    /* ==================== تقارير Excel ==================== */
+    function populateReportEmployeeSelect() {
+      const sel = document.getElementById("repEmpSelect");
+      const emps = usersList.filter(u => u.user_type === "employee");
+      sel.innerHTML = '<option value="ALL">كل الموظفين</option>' +
+        emps.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+    }
+
+    function applyReportPeriod() {
+      const period = document.getElementById("repPeriod").value;
+      const toDate = todayStr();
+      document.getElementById("repTo").value = toDate;
+
+      if (period === "weekly") {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        document.getElementById("repFrom").value = d.toISOString().slice(0, 10);
+      } else if (period === "monthly") {
+        document.getElementById("repFrom").value = toDate.slice(0, 8) + "01";
+      }
+    }
+
+    async function exportExcelReport() {
+      const empFilter = document.getElementById("repEmpSelect").value;
+      const fromDate = document.getElementById("repFrom").value;
+      const toDate = document.getElementById("repTo").value;
+
+      let attQuery = db.from("attendance").select("*").order("work_date", { ascending: true });
+      let reqQuery = db.from("requests").select("*").order("created_at", { ascending: true });
+
+      if (fromDate) attQuery = attQuery.gte("work_date", fromDate);
+      if (toDate) attQuery = attQuery.lte("work_date", toDate);
+      if (empFilter !== "ALL") {
+        attQuery = attQuery.eq("user_id", empFilter);
+        reqQuery = reqQuery.eq("user_id", empFilter);
+      }
+
+      const [attRes, reqRes] = await Promise.all([attQuery, reqQuery]);
+
+      const attSheetRows = (attRes.data || []).map(r => ({
+        "الموظف": usersMap[r.user_id]?.name || r.user_id,
+        "الفرع": branchesMap[r.branch_id]?.name || "-",
+        "التاريخ": r.work_date,
+        "وقت الحضور": r.check_in ? new Date(r.check_in).toLocaleString("ar-EG") : "-",
+        "وقت الانصراف": r.check_out ? new Date(r.check_out).toLocaleString("ar-EG") : "-",
+        "دقائق التأخير": r.late_minutes ?? 0,
+        "إجمالي الساعات": r.total_hours ?? 0,
+        "مسافة الحضور (م)": r.check_in_distance_m ?? "-",
+        "مسافة الانصراف (م)": r.check_out_distance_m ?? "-"
+      }));
+
+      const reqSheetRows = (reqRes.data || [])
+        .filter(r => {
+          const d = (r.leave_from || r.permission_date || r.created_at || "").slice(0, 10);
+          if (fromDate && d < fromDate) return false;
+          if (toDate && d > toDate) return false;
+          return true;
+        })
+        .map(r => ({
+          "الموظف": usersMap[r.user_id]?.name || r.user_id,
+          "الفرع": branchesMap[r.branch_id]?.name || "-",
+          "نوع الطلب": formatReqType(r.request_type),
+          "التفاصيل": formatReqDetails(r),
+          "السبب": r.reason || "-",
+          "الحالة": r.status === "approved" ? "مقبول" : (r.status === "rejected" ? "مرفوض" : "قيد الانتظار"),
+          "تاريخ الطلب": r.created_at ? new Date(r.created_at).toLocaleString("ar-EG") : "-"
+        }));
+
+      const wb = XLSX.utils.book_new();
+      const wsAtt = XLSX.utils.json_to_sheet(attSheetRows.length ? attSheetRows : [{ "ملاحظة": "لا توجد بيانات حضور في هذه الفترة" }]);
+      const wsReq = XLSX.utils.json_to_sheet(reqSheetRows.length ? reqSheetRows : [{ "ملاحظة": "لا توجد طلبات في هذه الفترة" }]);
+
+      XLSX.utils.book_append_sheet(wb, wsAtt, "الحضور والانصراف");
+      XLSX.utils.book_append_sheet(wb, wsReq, "الإجازات والأذونات والسلف");
+
+      const fileName = `VEXA_Report_${fromDate || "start"}_to_${toDate || "end"}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
